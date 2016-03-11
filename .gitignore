@@ -3,3 +3,8 @@
 topopt
 *.dat
 *.out
+output*
+binary*
+log*
+makevtu.pyc
+Restart*

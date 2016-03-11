@@ -4,6 +4,7 @@
 #include <TopOpt.h>
 #include <LinearElasticity.h>
 #include <MMA.h>
+#include <OC.h>
 #include <Filter.h>
 #include <MPIIO.h>
 #include <mpi.h>
@@ -30,6 +31,8 @@ int main(int argc, char *argv[]){
 	std::string    filenameDiag = "./";
 	FILE           *diag_fp = NULL;
 	PetscBool      flg;
+	typedef enum : PetscInt {MMA_t=0, OC_t=1} optimizer_type;
+	optimizer_type  optimizer;
 
 	// Initialize PETSc / MPI and pass input arguments to PETSc
 	PetscInitialize(&argc,&argv,PETSC_NULL,help);
@@ -60,10 +63,28 @@ int main(int argc, char *argv[]){
 	
 	// STEP 4: VISUALIZATION USING VTK
 	MPIIO *output = new MPIIO(opt->da_nodes,3,"ux, uy, uz",2,"x, xPhys");
-	// STEP 5: THE OPTIMIZER MMA
-	MMA *mma;
+
+	/* Get option - cast optimzers address to PetscInt */
+	PetscOptionsGetInt(NULL,"-optimizer",(PetscInt*)&optimizer,&flg);
+	if (!flg)
+		optimizer=MMA_t; /* Use MMA if not specified */
+	// STEP 5: THE OPTIMIZER
 	PetscInt itr=0;
-	opt->AllocateMMAwithRestart(&itr, &mma); // allow for restart !
+	MMA *mma = NULL;
+	OC *oc = NULL;
+
+	PetscPrintf(PETSC_COMM_WORLD,
+				"##############################################################\n");
+	if (optimizer == MMA_t){/* MMA */
+		PetscPrintf(PETSC_COMM_WORLD,"# Using MMA optimizer\n");
+		opt->AllocateMMAwithRestart(&itr, &mma); // allow for restart !
+	} else if ( optimizer == OC_t){ /* OC */
+		PetscPrintf(PETSC_COMM_WORLD,"# Using OC optimizer\n");
+		oc = new OC(opt->m);
+	} else { /* Unknown */
+		PetscPrintf(PETSC_COMM_WORLD,"# Unknown optimizer, aborting... \n");
+		ierr = -1; CHKERRQ(ierr);
+	}
 
 	// STEP 6: FILTER THE INITIAL DESIGN/RESTARTED DESIGN
 	ierr = filter->FilterProject(opt); CHKERRQ(ierr);
@@ -93,14 +114,28 @@ int main(int argc, char *argv[]){
 		ierr = filter->Gradients(opt); CHKERRQ(ierr);
 
 		// Sets outer movelimits on design variables
-		ierr = mma->SetOuterMovelimit(opt->Xmin,opt->Xmax,opt->movlim,opt->x,opt->xmin,opt->xmax); CHKERRQ(ierr);
+		if (optimizer == MMA_t){/* MMA */
+			ierr = mma->SetOuterMovelimit(opt->Xmin,opt->Xmax,opt->movlim,opt->x,
+										  opt->xmin,opt->xmax); CHKERRQ(ierr);
+		} else if ( optimizer == OC_t){ /* OC */
+			ierr = oc->SetOuterMovelimit(opt->Xmin,opt->Xmax,opt->movlim,opt->x,
+										 opt->xmin,opt->xmax); CHKERRQ(ierr);
+		}
 
-		// Update design by MMA
-		ierr = mma->Update(opt->x,opt->dfdx,opt->gx,opt->dgdx,opt->xmin,opt->xmax); CHKERRQ(ierr);
+		// Update design
+		if (optimizer == MMA_t){/* MMA */
+			ierr = mma->Update(opt->x,opt->dfdx,opt->gx,opt->dgdx,opt->xmin,opt->xmax); CHKERRQ(ierr);
+		} else if ( optimizer == OC_t){ /* OC */
+			ierr = oc->Update(opt->x,opt->dfdx,opt->gx,opt->dgdx,opt->xmin,opt->xmax,opt->volfrac); CHKERRQ(ierr);
+		}
 
 		// Inf norm on the design change
-		ch = mma->DesignChange(opt->x,opt->xold);
-		
+		if (optimizer == MMA_t){/* MMA */
+			ch = mma->DesignChange(opt->x,opt->xold);
+		} else if ( optimizer == OC_t){ /* OC */
+			ch = oc->DesignChange(opt->x,opt->xold);
+		}
+
 		// Filter design field
 		ierr = filter->FilterProject(opt); CHKERRQ(ierr);
 
@@ -121,23 +156,26 @@ int main(int argc, char *argv[]){
 		}
 
 		// Dump data needed for restarting code at termination
-		if (itr%3==0)	{
+		if (itr%3==0 && optimizer == MMA_t){
 			opt->WriteRestartFiles(&itr, mma);
 			physics->WriteRestartFiles();
 		}
 	}
 	// Write restart WriteRestartFiles
-	opt->WriteRestartFiles(&itr, mma);  
-	physics->WriteRestartFiles();
+	if (optimizer == MMA_t){
+		opt->WriteRestartFiles(&itr, mma);
+		physics->WriteRestartFiles();
+	}
 
 	// Dump final design
 	output->WriteVTK(opt->da_nodes,physics->GetStateField(),opt, itr+1);
 
 	// STEP 7: CLEAN UP AFTER YOURSELF
-	delete mma;
+	if (mma!=NULL){ delete mma;}
+	if (oc!=NULL){ delete oc;}
 	delete output;
 	delete filter;
-	delete opt;  
+	delete opt;
 	delete physics;
 
 	// Finalize PETSc / MPI

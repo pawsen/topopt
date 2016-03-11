@@ -33,7 +33,7 @@ include ${PETSC_DIR}/lib/petsc/conf/test
 .DEFAULT_GOAL := all
 .PHONY: all
 all: topopt
-topopt: main.o TopOpt.o LinearElasticity.o MMA.o Filter.o PDEFilter.o MPIIO.o
+topopt: main.o TopOpt.o LinearElasticity.o MMA.o OC.o Filter.o PDEFilter.o MPIIO.o
 	rm -rf topopt
 	-${CLINKER}  $^ -g ${PETSC_SYS_LIB} -o $@
 
