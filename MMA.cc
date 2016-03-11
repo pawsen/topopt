@@ -1,3 +1,4 @@
+// -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*-
 
 #include <MMA.h>
 #include <iostream>
@@ -6,6 +7,7 @@
 
 MMA::MMA(PetscInt nn, PetscInt mm, PetscInt kk, Vec xo1t,Vec xo2t,Vec Ut,Vec Lt, 
 		PetscScalar *at, PetscScalar *ct, PetscScalar *dt){
+	// Initialize with restart and specify subproblem parameters
 	n = nn;
 	m = mm;
 	k = kk;
@@ -92,6 +94,8 @@ MMA::MMA(PetscInt nn, PetscInt mm, PetscInt kk, Vec xo1t,Vec xo2t,Vec Ut,Vec Lt,
 }
 
 MMA::MMA(PetscInt nn, PetscInt mm, PetscInt kk, Vec xo1t,Vec xo2t,Vec Ut,Vec Lt){
+	// Initialize with restart from itr
+
 	n = nn;
 	m = mm;
 	k = kk;
@@ -112,6 +116,7 @@ MMA::MMA(PetscInt nn, PetscInt mm, PetscInt kk, Vec xo1t,Vec xo2t,Vec Ut,Vec Lt)
 	d = new PetscScalar[m];
 
 	for (PetscInt i=0;i<m;i++){
+		/* a[i] for volume constraint is always zero */
 		a[i] = 0.0;
 		c[i] = 1000.0;
 		d[i] = 0.0;
@@ -181,6 +186,8 @@ MMA::MMA(PetscInt nn, PetscInt mm, PetscInt kk, Vec xo1t,Vec xo2t,Vec Ut,Vec Lt)
 
 MMA::MMA(PetscInt nn, PetscInt mm,Vec x, PetscScalar *at, PetscScalar *ct,
 		PetscScalar *dt){
+	// User defined subproblem penalization
+
 	n = nn;
 	m = mm;
 
@@ -231,6 +238,8 @@ MMA::MMA(PetscInt nn, PetscInt mm,Vec x, PetscScalar *at, PetscScalar *ct,
 }
 
 MMA::MMA(PetscInt nn, PetscInt mm,Vec x){
+	// Construct using defaults subproblem penalization
+
 	n = nn;
 	m = mm;
 
@@ -594,8 +603,21 @@ PetscErrorCode MMA::GenSub(Vec xval, Vec dfdx, PetscScalar *gx, Vec *dgdx, Vec x
 		bet[i]  = Min(xmaxv[i],0.9*Uv[i]+0.1*xv[i]);
 		dfdxp = Max(0.0,dfdxv[i]);
 		dfdxm = Max(0.0,-1.0*dfdxv[i]);
-		p0v[i] = pow(Uv[i]-xv[i],2.0)*( dfdxp + 0.001*Abs(dfdxv[i]) + 0.5*feps/(Uv[i]-Lv[i]));
-		q0v[i] = pow(xv[i]-Lv[i],2.0)*( dfdxm + 0.001*Abs(dfdxv[i]) + 0.5*feps/(Uv[i]-Lv[i]));
+		/* Paw:
+		 * Herunder udregnes funktioner til brug ved MMA subproblem, se afsnit 6
+		 * i Svanbergs: "Some modelling aspects for the Matlab implementaion of
+		 * MMA".
+		 * p0v og q0v er hjælpefunktioner til objektfunktionen, pijv og qijv er
+		 * hjælpefunktioner til constraint. Se eq (6.1).
+		 * Den sidste den af ligningen( fra + 0.001*Abs... ) er givet ved κ,
+		 * lign (6.2), og er udkommenteret fordi Niels Aage tror det måske giver
+		 * hurtigere konvergens for MMA. Det er med vilje κ kun er udkommenteret
+		 * for p0v og q0v.
+		 */
+		// p0v[i] = pow(Uv[i]-xv[i],2.0)*( dfdxp + 0.001*Abs(dfdxv[i]) + 0.5*feps/(Uv[i]-Lv[i]));
+		// q0v[i] = pow(xv[i]-Lv[i],2.0)*( dfdxm + 0.001*Abs(dfdxv[i]) + 0.5*feps/(Uv[i]-Lv[i]));
+		p0v[i] = pow(Uv[i]-xv[i],2.0)*( dfdxp );
+		q0v[i] = pow(xv[i]-Lv[i],2.0)*( dfdxm );
 		for (PetscInt j=0;j<m;j++){
 			dfdxp = Max(0.0,dgdxv[j][i]);
 			dfdxm = Max(0.0,-1.0*dgdxv[j][i]);
