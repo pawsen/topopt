@@ -3,6 +3,10 @@
 
 #include <petsc.h>
 
+/*
+ * See comments in the footer of this file
+*/
+
 class MMA{
 	public:
 
@@ -112,5 +116,60 @@ class MMA{
 		PetscScalar Abs(PetscScalar d1);
 };
 
+/*
+  See also the Svanberg paper:
+  "Some modeling aspects for the Matlab implementation of MMA"
+  Notice that the paper describes an equality problem, whereas this
+  implementation solves a inequality problem.
+
+
+  Implementation by Niels Aage, August 2013.
+
+  PETSc implementation of the Method of Moving Asymptotes
+  The class solves a general non-linear programming problem
+  on standard from, i.e. non-linear objective f, m non-linear
+  inequality constraints g and box constraints on the n
+  design variables xmin, xmax.
+
+       min_x^n f(x)
+       s.t. g_j(x) < 0,   j = 1,m
+       xmin < x_i < xmax, i = 1,n
+
+  Each call to Update() sets up and solve the following
+  convex subproblem:
+
+       min_x     sum(p0j./(U-x)+q0j./(x-L)) + z + 0.5*z^2 + sum(c.*y + 0.5*d.*y.^2)
+
+       s.t.      sum(pij./(U-x)+qij./(x-L)) - ai*z - yi <= bi, i = 1,m
+                 Lj < alphaj <=  xj <= betaj < Uj,  j = 1,n
+                 yi >= 0, i = 1,m
+                 z >= 0.
+
+  The subproblem is solved using the dual formulation and
+  a primal/dual interior point method.
+
+  ----------------------------------------------------------------------
+  // Example usage:
+  // ALLOCATE:
+  MMA *mma = new MMA(n,m,x);  // where x is a PETSc Vec (Seq/MPI)
+  // OR //
+  MMA *mma = new MMA(n,m,x,a,c,d); // a,c,d can be set afterwards using
+                                   // SetAsymptotes(...)
+  // IF needed:
+  SetAsymptotes(..) // Set the initial, increase and decrease factors.
+  ConstraintModification(..)
+  SetRobustAsymptotesType(...)
+  while (not converged){
+	// compute objective, constraints and sens
+	// IF needed: rescale the bounds
+	mma->SetOuterMovelimi(...)
+	// Update the design field
+	mma->Update(...)
+	// IF needed: get residual of KKT sys
+	mma->KKTresidual(...)
+	// OR get inf_norm of the design change
+	mma->DesignChange(...)
+  }
+*/
 
 #endif
