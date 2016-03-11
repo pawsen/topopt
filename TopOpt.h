@@ -1,3 +1,4 @@
+// -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*-
 #ifndef TOPOPT_H
 #define TOPOPT_H
 
@@ -40,21 +41,24 @@ public:
 	TopOpt();
 	~TopOpt();
 
+	typedef enum : PetscInt {default_t=0,torsion_t=1,mbb_t=2} loadcase_type;
+	loadcase_type loadcase;
+
 	// Method to allocate MMA with/without restarting
 	PetscErrorCode AllocateMMAwithRestart(PetscInt *itr, MMA **mma);
 	PetscErrorCode WriteRestartFiles(PetscInt *itr, MMA *mma);
 	
 	// Physical domain variables
-	PetscScalar xc[6]; // Domain coordinates 
+	PetscScalar xc[6]; // Domain coordinates
 	PetscScalar dx,dy,dz; // Element size
 	PetscInt nxyz[3]; // Number of nodes in each direction
 	PetscInt nlvls; // Number of multigrid levels
 	PetscScalar nu; // Poisson's ratio
-	// Nodal mesh (contains physics)  
+	// Nodal mesh (contains physics)
 	DM da_nodes;
 	// element mesh (contains design)
 	DM da_elem;
-	
+
 	// Optimization parameters
 	PetscInt n; // Total number of design variables
 	PetscInt nloc	; // Local number of local nodes?
@@ -64,17 +68,17 @@ public:
 	PetscScalar *gx; // Array with constraint values
 	PetscScalar Xmin; // Min. value of design variables
 	PetscScalar Xmax; // Max. value of design variables
-	
+
 	PetscScalar movlim; // Max. change of design variables
 	PetscScalar volfrac; // Volume fraction
 	PetscScalar penal; // Penalization parameter
 	PetscScalar Emin, Emax; // Modified SIMP, max and min E
-	
+
 	PetscScalar rmin; // filter radius
-	
+
 	PetscInt maxItr; // Max iterations
 	PetscInt filter; // Filter type
-	
+
 	Vec x; // Design variables
 	Vec xPhys; // Physical variables (filtered x)
 	Vec dfdx; // Sensitivities of objective

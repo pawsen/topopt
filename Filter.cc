@@ -1,3 +1,5 @@
+// -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*-
+
 #include <Filter.h>
 
 
@@ -81,7 +83,7 @@ PetscErrorCode Filter::FilterProject(TopOpt *opt){
 		VecRestoreArray(opt->xPhys,&xp);
 	}
 	// COPY IN CASE OF SENSITIVITY FILTER
-	else {	ierr = VecCopy(opt->x,opt->xPhys); CHKERRQ(ierr); }
+	else { ierr = VecCopy(opt->x,opt->xPhys); CHKERRQ(ierr); }
 
 	return ierr;
 }

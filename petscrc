@@ -1,0 +1,36 @@
+## Print help on available options
+#-help
+
+-restart 0
+
+## domain size
+-xcmin  0.0
+-xcmax  3.0
+-ycmin  0.0
+-ycmax  1.0
+-zcmin  0.0
+-zcmax  1.0
+
+## resolution (nodes)
+# MESH DIMENSION NOT COMPATIBLE WITH NUMBER OF MULTIGRID LEVELS!
+# X - number of nodes 96 is cannot be halfened 3 times
+#-nx  193
+#-ny  65
+#-nz  65
+#-nx  97
+#-ny  33
+#-nz  33
+-nx  49
+-ny  17
+-nz  17
+
+## optimization 
+# (0=sens., 1=dens, 2=PDE)
+-filter 1
+-rmin 0.080000
+-volfrac 0.12
+-penal 3.000000
+-Emin 1.000000e-09
+-Emax 1.000000e+00 
+-maxItr 6
+-movlim 0.200000

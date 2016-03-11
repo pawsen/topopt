@@ -1,3 +1,5 @@
+// -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*-
+
 #include <petsc.h>
 #include <TopOpt.h>
 #include <LinearElasticity.h>
@@ -20,9 +22,32 @@ int main(int argc, char *argv[]){
 
 	// Error code for debugging
 	PetscErrorCode ierr;
-	
+
+	/* new variables */
+	//PetscInt       optimizer;
+	std::string    workdir = "./";
+	char           workdirChar[PETSC_MAX_PATH_LEN];
+	std::string    filenameDiag = "./";
+	FILE           *diag_fp = NULL;
+	PetscBool      flg;
+
 	// Initialize PETSc / MPI and pass input arguments to PETSc
 	PetscInitialize(&argc,&argv,PETSC_NULL,help);
+
+	/* Set workdir */
+	PetscOptionsGetString(NULL,"-workdir",workdirChar,sizeof(workdirChar),&flg);
+	if (flg){
+		workdir = "";
+		workdir.append(workdirChar);
+	}
+
+	/* Open file "diagnostics.dat" in workdir and write header */
+	filenameDiag = workdir + "/diagnostics.dat";
+	PetscPrintf(PETSC_COMM_WORLD,"%s\n",filenameDiag.c_str());
+	diag_fp = fopen(filenameDiag.c_str(),"w");
+	if (!diag_fp) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_SYS,"Cannot open file = %s \n",
+						   filenameDiag.c_str());
+	PetscFPrintf(PETSC_COMM_WORLD,diag_fp,"It.\tobj\t.g[0]\tch.\ttime\n");
 
 	// STEP 1: THE OPTIMIZATION PARAMETERS, DATA AND MESH (!!! THE DMDA !!!)
 	TopOpt *opt = new TopOpt();
@@ -43,7 +68,7 @@ int main(int argc, char *argv[]){
 	// STEP 6: FILTER THE INITIAL DESIGN/RESTARTED DESIGN
 	ierr = filter->FilterProject(opt); CHKERRQ(ierr);
 	
-	// STEP 7: OPTIMIZATION LOOP   
+	// STEP 7: OPTIMIZATION LOOP
 	PetscScalar ch = 1.0;
 	double t1,t2;
 	while (itr < opt->maxItr && ch > 0.01){
@@ -85,6 +110,10 @@ int main(int argc, char *argv[]){
 		// Print to screen
 		PetscPrintf(PETSC_COMM_WORLD,"It.: %i, obj.: %f, g[0]: %f, ch.: %f, time: %f\n",
 				itr,opt->fx,opt->gx[0], ch,t2-t1);
+
+		/* Print to diagnostics.dat (rank0 only) */
+		PetscFPrintf(PETSC_COMM_WORLD,diag_fp,"%i\t%f\t%f\t%f\t%f\n",
+					 itr,opt->fx,opt->gx[0], ch,t2-t1);
 
 		// Write field data: first 10 iterations and then every 20th
 		if (itr<11 || itr%20==0){

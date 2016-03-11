@@ -2,58 +2,57 @@
 #include <cmath>
 
 /*
- Authors: Niels Aage, Erik Andreassen, Boyan Lazarov, August 2013
+  Authors: Niels Aage, Erik Andreassen, Boyan Lazarov, August 2013
 
- Disclaimer:                                                              
- The authors reserves all rights but does not guaranty that the code is   
- free from errors. Furthermore, we shall not be liable in any event     
- caused by the use of the program.                                     
+  Disclaimer:
+  The authors reserves all rights but does not guaranty that the code is
+  free from errors. Furthermore, we shall not be liable in any event
+  caused by the use of the program.
 */
 
 
 TopOpt::TopOpt(){
-      
-  x=NULL;
-  xPhys=NULL;
-  dfdx=NULL;
-  dgdx=NULL;
-  gx=NULL;
-  da_nodes=NULL;
-  da_elem=NULL;
+
+	x=NULL;
+	xPhys=NULL;
+	dfdx=NULL;
+	dgdx=NULL;
+	gx=NULL;
+	da_nodes=NULL;
+	da_elem=NULL;
   
-  xo1=NULL;
-  xo2=NULL;
-  U=NULL;
-  L=NULL;
-  
-  SetUp();
-  
+	xo1=NULL;
+	xo2=NULL;
+	U=NULL;
+	L=NULL;
+
+	SetUp();
+
 }
 
 TopOpt::~TopOpt(){
-  
-  
-    // Delete vectors
-    if (x!=NULL){ VecDestroy(&x); }
-    if (dfdx!=NULL){ VecDestroy(&dfdx); }
-    if (dgdx!=NULL){ VecDestroyVecs(m,&dgdx); }
-    // Densities
-    if (xPhys!=NULL){ VecDestroy(&xPhys); }
-    if (xold!=NULL){ VecDestroy(&xold); }
-    if (xmin!=NULL){ VecDestroy(&xmin); }
-    if (xmax!=NULL){ VecDestroy(&xmax); }
-    
-    if (da_nodes!=NULL){ DMDestroy(&(da_nodes)); }
-    if (da_elem!=NULL){ DMDestroy(&(da_elem)); }
-    
-    // Delete constraints
-    if (gx!=NULL){ delete [] gx; }
-    
-    // mma restart method    		
-    if (xo1!=NULL){ VecDestroy(&xo1); }
-    if (xo2!=NULL){ VecDestroy(&xo2); }
-    if (L!=NULL){ VecDestroy(&L); }
-    if (U!=NULL){ VecDestroy(&U);  }
+
+	// Delete vectors
+	if (x!=NULL){ VecDestroy(&x); }
+	if (dfdx!=NULL){ VecDestroy(&dfdx); }
+	if (dgdx!=NULL){ VecDestroyVecs(m,&dgdx); }
+	// Densities
+	if (xPhys!=NULL){ VecDestroy(&xPhys); }
+	if (xold!=NULL){ VecDestroy(&xold); }
+	if (xmin!=NULL){ VecDestroy(&xmin); }
+	if (xmax!=NULL){ VecDestroy(&xmax); }
+
+	if (da_nodes!=NULL){ DMDestroy(&(da_nodes)); }
+	if (da_elem!=NULL){ DMDestroy(&(da_elem)); }
+
+	// Delete constraints
+	if (gx!=NULL){ delete [] gx; }
+
+	// mma restart method
+	if (xo1!=NULL){ VecDestroy(&xo1); }
+	if (xo2!=NULL){ VecDestroy(&xo2); }
+	if (L!=NULL){ VecDestroy(&L); }
+	if (U!=NULL){ VecDestroy(&U);  }
 }
 
 
@@ -61,32 +60,35 @@ TopOpt::~TopOpt(){
 //PetscErrorCode TopOpt::SetUp(Vec CRAPPY_VEC){
 PetscErrorCode TopOpt::SetUp(){
 	PetscErrorCode ierr;
-  
+
+	/* SET DEFAULTS for loadcase */
+	loadcase = default_t;
+
 	// SET DEFAULTS for FE mesh and levels for MG solver
-        nxyz[0] = 65;//129;
-        nxyz[1] = 33;//65;
-        nxyz[2] = 33;//65;
-        xc[0] = 0.0;
-        xc[1] = 2.0;
-        xc[2] = 0.0;
-        xc[3] = 1.0;
-        xc[4] = 0.0;
-        xc[5] = 1.0;
+	nxyz[0] = 65;//129;
+	nxyz[1] = 33;//65;
+	nxyz[2] = 33;//65;
+	xc[0] = 0.0;
+	xc[1] = 2.0;
+	xc[2] = 0.0;
+	xc[3] = 1.0;
+	xc[4] = 0.0;
+	xc[5] = 1.0;
 	nu=0.3;
-        nlvls = 4;
+	nlvls = 4;
 	
 	// SET DEFAULTS for optimization problems
 	volfrac = 0.12;
 	maxItr = 400;
-        rmin = 0.08;
-        penal = 3.0;
-        Emin = 1.0e-9;
-        Emax = 1.0;
-        filter = 0; // 0=sens,1=dens,2=PDE - other val == no filtering
-        m = 1; // volume constraint
-        Xmin = 0.0;
-        Xmax = 1.0;
-        movlim = 0.2;
+	rmin = 0.08;
+	penal = 3.0;
+	Emin = 1.0e-9;
+	Emax = 1.0;
+	filter = 0; // 0=sens,1=dens,2=PDE - other val == no filtering
+	m = 1; // volume constraint
+	Xmin = 0.0;
+	Xmax = 1.0;
+	movlim = 0.2;
 	restart = PETSC_TRUE;
 	
 	ierr = SetUpMESH(); CHKERRQ(ierr);
@@ -104,17 +106,20 @@ PetscErrorCode TopOpt::SetUpMESH(){
 	// Read input from arguments
 	PetscBool flg;
 	
+	// Loadcase parameter - cast loadcase address to PetscInt
+	PetscOptionsGetInt(NULL,"-loadcase",(PetscInt*)&loadcase,&flg);
+
 	// Physics parameters
 	PetscOptionsGetInt(NULL,"-nx",&(nxyz[0]),&flg);
 	PetscOptionsGetInt(NULL,"-ny",&(nxyz[1]),&flg);
 	PetscOptionsGetInt(NULL,"-nz",&(nxyz[2]),&flg);
-	PetscOptionsGetReal(NULL,"-xcmin",&(xc[0]),&flg);	
+	PetscOptionsGetReal(NULL,"-xcmin",&(xc[0]),&flg);
 	PetscOptionsGetReal(NULL,"-xcmax",&(xc[1]),&flg);
 	PetscOptionsGetReal(NULL,"-ycmin",&(xc[2]),&flg);
 	PetscOptionsGetReal(NULL,"-ycmax",&(xc[3]),&flg);
 	PetscOptionsGetReal(NULL,"-zcmin",&(xc[4]),&flg);
 	PetscOptionsGetReal(NULL,"-zcmax",&(xc[5]),&flg);
-        PetscOptionsGetReal(NULL,"-penal",&penal,&flg);
+	PetscOptionsGetReal(NULL,"-penal",&penal,&flg);
 // 	PetscOptionsGetReal(NULL,"-nu",&(nu),&flg);
 	PetscOptionsGetInt(NULL,"-nlvls",&nlvls,&flg);
 
@@ -127,14 +132,15 @@ PetscErrorCode TopOpt::SetUpMESH(){
 	PetscPrintf(PETSC_COMM_WORLD,"# Number of elements:                    (%i,%i,%i) \n",nxyz[0]-1,nxyz[1]-1,nxyz[2]-1);
 	PetscPrintf(PETSC_COMM_WORLD,"# Dimensions: (-xcmin,-xcmax,..,-zcmax): (%f,%f,%f)\n",xc[1]-xc[0],xc[3]-xc[2],xc[5]-xc[4]);
 	PetscPrintf(PETSC_COMM_WORLD,"# -nlvls: %i\n",nlvls);
-       	PetscPrintf(PETSC_COMM_WORLD,"########################################################################\n");
+	ierr = PetscPrintf(PETSC_COMM_WORLD,"########################################################################\n");
+	CHKERRQ(ierr);
 
 	// Check if the mesh supports the chosen number of MG levels
 	PetscScalar divisor = PetscPowScalar(2.0,(PetscScalar)nlvls-1.0);
 	// x - dir
 	if ( std::floor((PetscScalar)(nxyz[0]-1)/divisor) != (nxyz[0]-1.0)/((PetscInt)divisor) ) {
 		PetscPrintf(PETSC_COMM_WORLD,"MESH DIMENSION NOT COMPATIBLE WITH NUMBER OF MULTIGRID LEVELS!\n");
-                PetscPrintf(PETSC_COMM_WORLD,"X - number of nodes %i is cannot be halfened %i times\n",nxyz[0],nlvls-1);
+		PetscPrintf(PETSC_COMM_WORLD,"X - number of nodes %i is cannot be halfened %i times\n",nxyz[0],nlvls-1);
 		exit(0);
 	}	
 	// y - dir
@@ -258,27 +264,28 @@ PetscErrorCode TopOpt::SetUpOPT(){
 	PetscOptionsGetReal(NULL,"-Emin",&Emin,&flg);
 	PetscOptionsGetReal(NULL,"-Emax",&Emax,&flg);
 	PetscOptionsGetReal(NULL,"-volfrac",&volfrac,&flg);
-        PetscOptionsGetReal(NULL,"-penal",&penal,&flg);
+	PetscOptionsGetReal(NULL,"-penal",&penal,&flg);
 	PetscOptionsGetReal(NULL,"-rmin",&rmin,&flg);
 	PetscOptionsGetInt(NULL,"-maxItr",&maxItr,&flg);
 	PetscOptionsGetInt(NULL,"-filter",&filter,&flg);
 	PetscOptionsGetReal(NULL,"-Xmin",&Xmin,&flg);
-        PetscOptionsGetReal(NULL,"-Xmax",&Xmax,&flg);
+	PetscOptionsGetReal(NULL,"-Xmax",&Xmax,&flg);
 	PetscOptionsGetReal(NULL,"-movlim",&movlim,&flg);
-        
+
 	PetscPrintf(PETSC_COMM_WORLD,"################### Optimization settings ####################\n");
 	PetscPrintf(PETSC_COMM_WORLD,"# Problem size: n= %i, m= %i\n",n,m);
+	PetscPrintf(PETSC_COMM_WORLD,"# (n= number of design variables, m=number of constraints)\n");
 	PetscPrintf(PETSC_COMM_WORLD,"# -filter: %i  (0=sens., 1=dens, 2=PDE)\n",filter);
 	PetscPrintf(PETSC_COMM_WORLD,"# -rmin: %f\n",rmin);
 	PetscPrintf(PETSC_COMM_WORLD,"# -volfrac: %f\n",volfrac);
-        PetscPrintf(PETSC_COMM_WORLD,"# -penal: %f\n",penal);
+	PetscPrintf(PETSC_COMM_WORLD,"# -penal: %f\n",penal);
 	PetscPrintf(PETSC_COMM_WORLD,"# -Emin/-Emax: %e - %e \n",Emin,Emax);
 	PetscPrintf(PETSC_COMM_WORLD,"# -maxItr: %i\n",maxItr);
 	PetscPrintf(PETSC_COMM_WORLD,"# -movlim: %f\n",movlim);
-       	PetscPrintf(PETSC_COMM_WORLD,"##############################################################\n");
+	PetscPrintf(PETSC_COMM_WORLD,"##############################################################\n");
 
-        // Allocate after input
-        gx = new PetscScalar[m];
+	// Allocate after input
+	gx = new PetscScalar[m];
 	if (filter==0){
 		Xmin = 0.001; // Prevent division by zero in filter
 	}
@@ -310,6 +317,7 @@ PetscErrorCode TopOpt::AllocateMMAwithRestart(PetscInt *itr, MMA **mma)  {
 	PetscScalar cMMA[m];
 	PetscScalar dMMA[m];
 	for (PetscInt i=0;i<m;i++){
+		// aMMA for volume constraint is always zero
 	    aMMA[i]=0.0;
 	    dMMA[i]=0.0;
 	    cMMA[i]=1000.0;

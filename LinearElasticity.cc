@@ -1,3 +1,5 @@
+// -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*-
+
 #include <LinearElasticity.h>
 
 /*
@@ -73,33 +75,150 @@ PetscErrorCode LinearElasticity::SetUpLoadAndBC(TopOpt *opt){
 	// Compute epsilon parameter for finding points in space:
 	PetscScalar epsi = PetscMin(a*0.05,PetscMin(b*0.05,c*0.05));
 
-	// Set the values:
-	// In this case: N = the wall at x=xmin is fully clamped
-	//               RHS(z) = sin(pi*y/Ly) at x=xmax,z=zmin;
-	// OR
-	//               RHS(z) = -0.1 at x=xmax,z=zmin;
+	/* write load case to screen */
+	PetscPrintf(PETSC_COMM_WORLD,
+		    "##############################################################\n");
+	ierr = PetscPrintf(PETSC_COMM_WORLD, "Setting supports and loads for loadcase %d\n",
+					   opt->loadcase);CHKERRQ(ierr);
+
+
 	for (PetscInt i=0;i<nn;i++){
-		// Make a wall with all dofs clamped
-		if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[0]) < epsi){
-			VecSetValueLocal(N,i,0.0,INSERT_VALUES);
-			VecSetValueLocal(N,++i,0.0,INSERT_VALUES);
-			VecSetValueLocal(N,++i,0.0,INSERT_VALUES);
-		}
-		// Line load
-		if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi && 
-				  PetscAbsScalar(lcoorp[i+2]-opt->xc[4]) < epsi){
-			VecSetValueLocal(RHS,i+2,-0.1,INSERT_VALUES);
-		}
-		// Adjust the corners
-		if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi && 
-				  PetscAbsScalar(lcoorp[i+1]-opt->xc[2]) < epsi && 
-				  PetscAbsScalar(lcoorp[i+2]-opt->xc[4]) < epsi ){
-			VecSetValueLocal(RHS,i+2,-0.05,INSERT_VALUES);
-		}
-		if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi && 
-				  PetscAbsScalar(lcoorp[i+1]-opt->xc[3]) < epsi && 
-   				  PetscAbsScalar(lcoorp[i+2]-opt->xc[4]) < epsi){
-			VecSetValueLocal(RHS,i+2,-0.05,INSERT_VALUES);
+		if(opt->loadcase == opt->torsion_t) {
+			/* CASE: torsion */
+
+			/* ---supports--- */
+
+			// Make a wall with all dofs clamped
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[0]) < epsi){
+				VecSetValueLocal(N,i,0.0,INSERT_VALUES);
+				VecSetValueLocal(N,++i,0.0,INSERT_VALUES);
+				VecSetValueLocal(N,++i,0.0,INSERT_VALUES);
+			}
+
+			/* ---loads--- */
+
+			/* z direction */
+
+			// Point load(s) (xmax, ymin, (zmin-zmax)/2) negative z, 1 or 2
+			// depending on if we have a node at half point
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi &&
+				PetscAbsScalar(lcoorp[i+1]-opt->xc[2]) < epsi  &&
+				PetscAbsScalar(lcoorp[i+2]-(opt->xc[5]-opt->xc[4])/2.0) < (opt->dz/2.0+epsi) ){
+
+				if ( PetscAbsScalar(lcoorp[i+2]-(opt->xc[5]-opt->xc[4])/2.0) < epsi ) {
+					PetscPrintf(PETSC_COMM_SELF,"nodal load set\n");
+					VecSetValueLocal(RHS,i+2,-0.1,INSERT_VALUES); /* a single node */	
+				} else {
+					PetscPrintf(PETSC_COMM_SELF,"nodal load set\n");	
+					VecSetValueLocal(RHS,i+2,-0.05,INSERT_VALUES); /* two nodes */
+				}
+
+			}
+			// Point load(s) (xmax, ymax, (zmin-zmax)/2) positve z, 1 or 2
+			// depending on if we have a node at half point
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi &&
+				PetscAbsScalar(lcoorp[i+1]-opt->xc[3]) < epsi &&
+				PetscAbsScalar(lcoorp[i+2]-(opt->xc[5]-opt->xc[4])/2.0) < (opt->dz/2+epsi) ){
+
+				if ( PetscAbsScalar(lcoorp[i+2]-(opt->xc[5]-opt->xc[4])/2.0) < epsi ) {
+					PetscPrintf(PETSC_COMM_SELF,"nodal load set\n");	
+					VecSetValueLocal(RHS,i+2,0.1,INSERT_VALUES); /* a single node */
+				} else {
+					PetscPrintf(PETSC_COMM_SELF,"nodal load set\n");	
+					VecSetValueLocal(RHS,i+2,0.05,INSERT_VALUES); /* two nodes */
+				}
+
+			}
+
+			/* y direction */
+
+			// Point load(s) (xmax, (ymin-ymax)/2, zmin) negative y, 1 or 2
+			// depending on if we have a node at half point
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi &&
+				PetscAbsScalar(lcoorp[i+1]-(opt->xc[3]-opt->xc[2])/2.0) < (opt->dy/2.0+epsi) &&
+				PetscAbsScalar(lcoorp[i+2]-opt->xc[4]) < epsi ){
+
+				if ( PetscAbsScalar(lcoorp[i+1]-(opt->xc[3]-opt->xc[2])/2.0) < epsi ) {
+					PetscPrintf(PETSC_COMM_SELF,"nodal load set\n");	
+					VecSetValueLocal(RHS,i+1,-0.1,INSERT_VALUES); /* a single node */
+				} else {
+					PetscPrintf(PETSC_COMM_SELF,"nodal load set\n");	
+					VecSetValueLocal(RHS,i+1,-0.05,INSERT_VALUES); /* two nodes */
+				}
+
+			}
+			// Point load(s) (xmax, (ymin-ymax)/2, zmax) positive y, 1 or 2
+			// depending on if we have a node at half point
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi &&
+				PetscAbsScalar(lcoorp[i+1]-(opt->xc[3]-opt->xc[2])/2.0) < (opt->dy/2.0+epsi) &&
+				PetscAbsScalar(lcoorp[i+2]-opt->xc[5]) < epsi ){
+
+				if ( PetscAbsScalar(lcoorp[i+1]-(opt->xc[3]-opt->xc[2])/2.0) < epsi ) {
+					PetscPrintf(PETSC_COMM_SELF,"nodal load set\n");	
+					VecSetValueLocal(RHS,i+1,0.1,INSERT_VALUES); /* a single node */
+				} else {
+					PetscPrintf(PETSC_COMM_SELF,"nodal load set\n");	
+					VecSetValueLocal(RHS,i+1,0.05,INSERT_VALUES); /* two nodes */
+				}
+
+			}
+		} else if (opt->loadcase == opt->mbb_t){
+			/* CASE: mbb */
+			
+			/* ---supports--- */
+
+			// Simply supported line (xmin, ymin, z) y
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[0]) < epsi &&
+				PetscAbsScalar(lcoorp[i+1]-opt->xc[2]) < epsi){
+				VecSetValueLocal(N,i+1,0.0,INSERT_VALUES);
+			}
+			// Symmetry plane (xmax, y, z) x
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi){
+				VecSetValueLocal(N,i,0.0,INSERT_VALUES);
+			}
+
+			/* ---loads--- */
+
+			// Line load (xmax, ymax, z) negative y
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi &&
+				PetscAbsScalar(lcoorp[i+1]-opt->xc[3]) < epsi){
+				// adjust corners zmin zmax
+				if (PetscAbsScalar(lcoorp[i+2]-opt->xc[4]) < epsi ||
+					PetscAbsScalar(lcoorp[i+2]-opt->xc[5]) < epsi ){
+					VecSetValueLocal(RHS,i+1,-0.05,INSERT_VALUES);
+				} else {
+					VecSetValueLocal(RHS,i+1,-0.1,INSERT_VALUES);
+				}
+			}
+		} else {
+			/* CASE: default */
+			// Set the values:
+			// In this case: N = the wall at x=xmin is fully clamped
+			//               RHS(z) = sin(pi*y/Ly) at x=xmax,z=zmin;
+			// OR
+			//               RHS(z) = -0.1 at x=xmax,z=zmin;
+			// Make a wall with all dofs clamped
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[0]) < epsi){
+				VecSetValueLocal(N,i,0.0,INSERT_VALUES);
+				VecSetValueLocal(N,++i,0.0,INSERT_VALUES);
+				VecSetValueLocal(N,++i,0.0,INSERT_VALUES);
+			}
+			// Line load
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi && 
+				PetscAbsScalar(lcoorp[i+2]-opt->xc[4]) < epsi){
+				VecSetValueLocal(RHS,i+2,-0.1,INSERT_VALUES);
+			}
+			// Adjust the corners
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi && 
+				PetscAbsScalar(lcoorp[i+1]-opt->xc[2]) < epsi && 
+				PetscAbsScalar(lcoorp[i+2]-opt->xc[4]) < epsi ){
+				VecSetValueLocal(RHS,i+2,-0.05,INSERT_VALUES);
+			}
+			if (i % 3 == 0 && PetscAbsScalar(lcoorp[i]-opt->xc[1]) < epsi && 
+				PetscAbsScalar(lcoorp[i+1]-opt->xc[3]) < epsi && 
+				PetscAbsScalar(lcoorp[i+2]-opt->xc[4]) < epsi){
+				VecSetValueLocal(RHS,i+2,-0.05,INSERT_VALUES);
+			}
 		}
 	}
 
@@ -332,7 +451,7 @@ PetscErrorCode LinearElasticity::ComputeObjectiveConstraintsSensitivities(TopOpt
 		// Use SIMP for stiffness interpolation
 		PetscScalar uKu=0.0;
 		for (PetscInt k=0;k<24;k++){
-			for (PetscInt h=0;h<24;h++){	
+			for (PetscInt h=0;h<24;h++){
 				uKu += up[edof[k]]*KE[k*24+h]*up[edof[h]];
 			}
 		}
@@ -345,7 +464,7 @@ PetscErrorCode LinearElasticity::ComputeObjectiveConstraintsSensitivities(TopOpt
 	// Allreduce fx[0]
 	PetscScalar tmp=opt->fx;
 	opt->fx=0.0;
-	MPI_Allreduce(&tmp,&(opt->fx),1,MPIU_SCALAR,MPI_SUM,PETSC_COMM_WORLD);		
+	MPI_Allreduce(&tmp,&(opt->fx),1,MPIU_SCALAR,MPI_SUM,PETSC_COMM_WORLD);
 
 	// Compute volume constraint gx[0]
 	opt->gx[0]=0;
