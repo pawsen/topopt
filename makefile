@@ -5,7 +5,7 @@ DEBUG=-g   # debug
 #DEBUG=-O3 # optimize
 CFLAGS = -I. ${DEBUG}
 FFLAGS=
-CPPFLAGS=-I. ${DEBUG} -std=c++0x
+CPPFLAGS=-I. ${DEBUG} -std=c++0x -pedantic -Wextra
 FPPFLAGS=
 LOCDIR=
 EXAMPLESC=
